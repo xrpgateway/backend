@@ -2,6 +2,7 @@ const vorpal = require("vorpal")();
 const xrpl = require("xrpl");
 const wallet = require("./wallet/index");
 import xrpl_worker from "./data_workers/xrpl";
+import email from "./email";
 import { createOffer, priceOracle } from "./swappayments/dex";
 async function createWallet() {
   const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
@@ -75,11 +76,26 @@ vorpal
   .command("priceoracle [currency] [issuer]")
   .action(async function (args, callback) {
     try {
-      const res = await  priceOracle({
+      const res = await priceOracle({
         currency: args.currency,
-        issuer:  args.issuer,//"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B",
+        issuer: args.issuer, //"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B",
       });
-      console.log(res)
+      console.log(res);
+    } catch (e) {
+      console.error(e);
+    }
+    callback();
+  });
+
+vorpal
+  .command("sendemail [destination] [subject] [message]")
+  .action(async function (args, callback) {
+    try {
+      await email.sendEmail({
+        to: args.destination,
+        subject: args.subject,
+        text: args.message
+      })
     } catch (e) {
       console.error(e);
     }

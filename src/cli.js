@@ -3,6 +3,7 @@ const xrpl = require("xrpl");
 const wallet = require('./wallet/index')
 import xrpl_worker from './data_workers/xrpl'
 import { createOffer } from './swappayments/dex';
+import {creatCheck, createCheck} from './swappayments/check';
 async function createWallet() {
   const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
   await client.connect();
@@ -58,6 +59,7 @@ vorpal.command("xrppaymentath").action(async function (args, callback) {
 vorpal.command("offertest").action(async function (args, callback) {
   try {
     wallet.startTransactionQueueResolver()
+
     createOffer("3000", "2", {
       "currency" : "USD",
       "issuer" : "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"
@@ -67,5 +69,17 @@ vorpal.command("offertest").action(async function (args, callback) {
   }
   callback();
 })
+
+vorpal.command("checktest").action(async function (args, callback) {
+  try {
+    wallet.startTransactionQueueResolver()
+
+    createCheck("3000", "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn")
+  } catch (e) {
+    console.error(e);
+  }
+  callback();
+})
+
 
 vorpal.delimiter('xrpg$').show();

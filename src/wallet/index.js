@@ -12,34 +12,46 @@ function createWalletClient() {
   }
 }
 
-function sendTx(data) {
-  emitter.emit("txQueue", data);
+function sendTx(txData) {
+  return new Promise((resolve, reject) => {
+    const txReq = {
+      callBack: (txRes) => { resolve(txRes) },
+      txData
+    };
+    emitter.emit("txQueue", txReq);
+  });
 }
 
-async function sendXRP(destination, amount) {
+function sendXRP(destination, amount) {
   const txData = {
     TransactionType: "Payment",
     Account: wallet.address,
     Amount: xrpl.xrpToDrops(amount),
     Destination: destination,
   };
-  sendTx(txData);
+  return sendTx(txData);
 }
-
 
 function startTransactionQueueResolver() {
   createWalletClient();
-  emitter.on("txQueue", async (data) => {
-    await client.connect()
+  emitter.on("txQueue", async (txReq) => {
+    const data = txReq.txData
+    await client.connect();
     const prepared = await client.autofill(data);
     const max_ledger = prepared.LastLedgerSequence;
     console.log("Prepared transaction instructions:", prepared);
     console.log("Transaction cost:", xrpl.dropsToXrp(prepared.Fee), "XRP");
     console.log("Transaction expires after ledger:", max_ledger);
-    const signed = wallet.sign(prepared)
-    const tx = await client.submitAndWait(signed.tx_blob)
-    console.log(`TxResult: ${JSON.stringify(tx)}`)
+    const signed = wallet.sign(prepared);
+    const tx = await client.submitAndWait(signed.tx_blob);
+    console.log(`TxResult: ${JSON.stringify(tx)}`);
+    txReq.callBack(tx)
   });
 }
 
-module.exports = { sendTx, sendXRP, startTransactionQueueResolver, createWalletClient };
+module.exports = {
+  sendTx,
+  sendXRP,
+  startTransactionQueueResolver,
+  createWalletClient,
+};

@@ -1,3 +1,4 @@
+import { async } from "../../build/wallet";
 import xrpl_worker from "../data_workers/xrpl";
 const xrpReceived = require('../modals/XrpReceived')
 
@@ -17,6 +18,12 @@ async function isValidXrpTransfer(txHash, sender, amount){
         console.error(e)
     }
     return false
+}
+
+async function isValidCurrencyPayment(txHash, sender, amount, currency){
+    const tx = await xrpl_worker.getTxData(txHash)
+    const receiver = tx.result.Destination
+    
 }
 
 export {

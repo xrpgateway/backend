@@ -1,8 +1,11 @@
 const xrpl = require("xrpl");
 import PubSub from "pubsub-js";
 
+
+process.env.XRP_WEBHOOKH_URL = "wss://s.altnet.rippletest.net:51233"
 const start = async () => {
   try {
+    
     const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
     await client.connect();
     const response = await client.request({
@@ -56,6 +59,24 @@ const getTxData = async (txHash) => {
   return response
 }
 
+
+
+const getCheckId = async (txHash) =>{
+  try{
+  let data = await getTxData(txHash)
+  let amount = data["result"]["SendMax"]
+  let checkid = data["result"]["meta"]["AffectedNodes"][data["result"]["meta"]["AffectedNodes"].length-1]["CreatedNode"]["LedgerIndex"]
+  console.log(checkid)
+  return {checkid,amount}
+
+  }
+  catch{
+    return false
+  }
+
+}
+
+
 const getXRPPaymentPaths = async () => {
   const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
   await client.connect();
@@ -98,7 +119,8 @@ const xrpl_worker = {
   start,
   getTxData,
   getXRPPaymentPaths,
-  getOffers
+  getOffers,
+  getCheckId
 };
 
 export default xrpl_worker;

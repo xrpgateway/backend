@@ -37,7 +37,8 @@ router.post('/register', async (req, res) => {
             merchantKey: merchantPublicKey.toString(),
             merchantSecretKey,
             merchantPublicKey,
-            password: password
+            password: password,
+            xrpaddr: req.body.xrpaddr
         });
 
         await merchant.save();

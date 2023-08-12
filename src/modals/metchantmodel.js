@@ -26,6 +26,10 @@ const merchantSchema = new mongoose.Schema({
   totalpayout: {
     type: Number,
     default: 0
+  },
+  xrpaddr: {
+    type: String,
+    default: 0
   }
 });
 

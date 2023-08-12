@@ -5,8 +5,6 @@ function createOffer(receiveXrp, sendamount, currencyObj){
     sendTx({
         "TransactionType": "OfferCreate",
         "Account": process.env.WALLET_ADDRESS,
-        "Flags": 0,
-        "Sequence": 8,
         "TakerGets": receiveXrp,
         "TakerPays": currencyObj, /*{
           "currency": "GKO",

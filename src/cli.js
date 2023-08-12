@@ -39,7 +39,8 @@ vorpal.command("sendxrp [address] [amount]").action(async function (args, callba
     wallet.startTransactionQueueResolver()
     const address = args.address
     const amount = args.amount
-    wallet.sendXRP(address, amount)
+    const tx = await wallet.sendXRP(address, amount)
+    this.log(`RECEIVED TX---------------: \n `, tx)
   } catch (e) {
     console.error(e);
   }

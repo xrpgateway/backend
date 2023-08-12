@@ -1,0 +1,50 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "nodemonConfig": {
+    "exec": "npm run dev",
+    "watch": [
+      "src/*"
+    ]
+  },
+  "scripts": {
+    "server": "node ./build/",
+    "dev": "NODE_ENV=development npm-run-all build server",
+    "prod": "NODE_ENV=production npm-run-all build server",
+    "transpile": "babel ./src --out-dir build",
+    "clean": "rimraf build",
+    "build": "npm-run-all clean transpile",
+    "watch:dev": "nodemon"
+  },
+  "engines": {
+    "node": ">=16 <17"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-ws": "^5.0.2",
+    "litegraph.js": "^0.7.12",
+    "mongoose": "^7.0.3",
+    "node-fetch": "^2.6.9",
+    "pubsub-js": "^1.9.4",
+    "queue-event-emitter": "^2.1.1",
+    "vorpal": "^1.12.0",
+    "xrpl": "^2.7.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.21.0",
+    "@babel/core": "^7.21.3",
+    "@babel/preset-env": "^7.20.2",
+    "babel-plugin-inline-json-import": "^0.3.2",
+    "eslint": "^8.36.0",
+    "nodemon": "^2.0.22",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^4.4.1"
+  }
+}

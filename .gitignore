@@ -1,0 +1,17 @@
+node_modules
+.env
+npm-run-all
+npm-run-all.cmd
+npm-run-all.ps1
+nodemon.cmd
+nodemon.ps1
+nodemon
+run-p.ps1
+run-p.cmd
+run-p
+run-s.ps1
+run-s.cmd
+run-s
+.vscode
+package-lock.json
+build

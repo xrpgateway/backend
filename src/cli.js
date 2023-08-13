@@ -61,6 +61,36 @@ vorpal.command("xrppaymentath").action(async function (args, callback) {
   callback();
 });
 
+vorpal.command("fundmecurrency [xrp] [currency] [issuer]").action(async function (args, callback) {
+  try {
+    wallet.startTransactionQueueResolver()
+    const currencyObj = {
+      currency: args.currency,
+      issuer: args.issuer,
+    } 
+    const oracleRes = await priceOracle(currencyObj)
+    console.log(oracleRes)
+    const usdValue = (oracleRes * parseFloat(args.xrp)).toFixed(4)
+    console.log(usdValue)
+    currencyObj["value"] = usdValue
+
+    const tx = await wallet.sendTx({
+      TransactionType: "OfferCreate",
+      Account: process.env.WALLET_ADDRESS,
+      TakerGets: xrpl.xrpToDrops(args.xrp),
+      TakerPays:  currencyObj /*{
+            "currency": "GKO",
+            "issuer": "ruazs5h1qEsqpke88pcqnaseXdm6od2xc",
+            "value": "2"
+          }*/,
+    });
+    console.log(`ReceivedTX -->\n ${JSON.stringify(tx)}`)
+  } catch (e) {
+    console.error(e);
+  }
+  callback();
+});
+
 vorpal.command("offertest").action(async function (args, callback) {
   try {
     wallet.startTransactionQueueResolver()

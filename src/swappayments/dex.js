@@ -42,8 +42,8 @@ function createOffer(receiveXrp, sendamount, currencyObj) {
   sendTx({
     TransactionType: "OfferCreate",
     Account: process.env.WALLET_ADDRESS,
-    TakerGets: receiveXrp,
-    TakerPays: currencyObj /*{
+    TakerGets: currencyObj,
+    TakerPays: receiveXrp  /*{
           "currency": "GKO",
           "issuer": "ruazs5h1qEsqpke88pcqnaseXdm6od2xc",
           "value": "2"

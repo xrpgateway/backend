@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const Merchant = require('./metchantmodel');
+const Merchant = require('../modals/metchantmodel');
 
 const router = express.Router();
 

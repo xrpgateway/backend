@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const Merchant = require('../merchant/metchantmodel');
-const Transaction = require('./transactionmodel')
+const Merchant = require('../modals/metchantmodel');
+const Transaction = require('../modals/transactionmodel')
 const xrpl = require("xrpl");
-const {getTxData} = require('../data_workers/xrpl')
-
+const { getTxData } = require('../data_workers/xrpl')
+const { cashChecks } = require('../swappayments/cashcheck')
+const wallet = require('../wallet/index')
 // Endpoint to submit and validate a transaction
 router.post('/submitted', async (req, res) => {
     try {
@@ -37,9 +38,10 @@ router.post('/submitted', async (req, res) => {
 
 
         }
-        if (!success) {
+        if (success==false) {
             res.status(403).json({ error: "Not able to verify buddy" })
         }
+
 
         const transac = new Transaction({
             paymentType: transactiontype,
@@ -54,7 +56,9 @@ router.post('/submitted', async (req, res) => {
             extradata
         })
         await transac.save();
-
+        wallet.startTransactionQueueResolver();
+        
+        const tx = wallet.sendXRP(merchant.xrpaddr,success.amount);
         res.status(200).json({ message: 'Transaction submitted and validated successfully.' });
     } catch (error) {
         console.error('Error processing transaction:', error);
@@ -64,12 +68,25 @@ router.post('/submitted', async (req, res) => {
 });
 
 
-function check1(hashes,amount) {
-    for(let i =0;i<hashes.length;i++){
-        let data = getTxData(data);
+async function check1(hashes) {
+    try {
 
+        let data = await cashChecks(hashes[0]);
+        if (data == false) {
+            return false
+        }
+        if (data["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
+            return false
+        }
+
+
+
+        return {success:true,amount:data["result"]["Amount"]}
     }
-    return true
+    catch {
+        return false
+    }
+
 }
 function check2(hashes) {
     return true
@@ -161,7 +178,7 @@ const createChecks = async (amount, destination) => {
         "Account": sender,
         "Destination": "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo",
         "SendMax": "100",
-        
+
         "Expiration": 810113521,
         "DestinationTag": 1,
         "Fee": "12"
@@ -173,7 +190,7 @@ const createChecks = async (amount, destination) => {
 }
 //E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97
 
-const cashChecks = async(checkid) => {
+const cashCheckss = async (checkid) => {
     const client = new xrpl.Client('wss://s.altnet.rippletest.net:51233');
 
     await client.connect();
@@ -200,5 +217,4 @@ const cashChecks = async(checkid) => {
 
 }
 //createChecks(100,"fdf")
-cashChecks("E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97")
 module.exports = { router };

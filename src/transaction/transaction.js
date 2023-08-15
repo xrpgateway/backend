@@ -15,7 +15,6 @@ app.post("/api/split-payment/initiate", async (req, res) => {
 
   try {
     const splitPaymentID = crypto.randomUUID().toString();
-
     // Create a new transaction
     const transaction = new EscrowTransaction({
       spid: splitPaymentID,
@@ -33,12 +32,10 @@ app.post("/api/split-payment/initiate", async (req, res) => {
       email.sendEmail({
         to: email_,
         subject: "Payment Link for Split Payment",
-        text: `Here is your payment link: <link>?id=${splitPaymentID}`,
+        html: `<!DOCTYPE html><html><body><h1>Your split payment link!</h1><br><a href="/?id=${splitPaymentID}">Pay Now</a></body></html>`
       });
     }
 
-    // Save invitations and transaction
-    //await Promise.all(invitations.map(invitation => invitation.save()));
     await transaction.save();
 
     res
@@ -77,7 +74,7 @@ router.post("/submitted", async (req, res) => {
     // Fetch the merchant's public key
     const merchant = await Merchant.findOne({ merchantId });
     if (!merchant) {
-      return res.status(404).json({ error: "Merchant not found." });
+      return res.status(404).json({ success: false, error: "Merchant not found." });
     }
 
     // Verify the signed hash
@@ -97,9 +94,9 @@ router.post("/submitted", async (req, res) => {
     let success = false;
     switch (transactiontype) {
       case 0:
-        success = check1(transactionHashes);
+        success = await check1(transactionHashes);
       case 1:
-        success = await check2(transactionHashes);
+        success = await check2(transactionHashes, amount);
       /*case 2:
         // need to handle using seprate endpoint
         success = check3(transactionHashes)*/
@@ -160,7 +157,7 @@ async function check1(hashes) {
       return false;
     }
 
-    return { success: true, amount: data["result"]["Amount"] };
+    return true
   } catch {
     return false;
   }
@@ -172,10 +169,6 @@ async function check2(hashes, amount) {
     return true;
   }
   return false;
-}
-
-function check3(hashes) {
-  return true;
 }
 
 router.get("/signtest", async (req, res) => {

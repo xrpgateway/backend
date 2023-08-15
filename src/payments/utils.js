@@ -1,6 +1,7 @@
 import xrpl_worker from "../data_workers/xrpl";
 import { createOffer, priceOracle } from "../swappayments/dex";
 const xrpReceived = require("../modals/XrpReceived");
+const xrpl = require('xrpl')
 
 async function isValidTransaction(txHash, amount) {
   try {
@@ -15,7 +16,7 @@ async function isValidTransaction(txHash, amount) {
     ) {
       const amountXRP = priceOracle(amount_) * parseFloat(amount_.value);
       if (
-        Math.abs(amountXRP - amount) < 3 &&
+        Math.abs(amountXRP - parseFloat(xrpl.dropsToXrp(amount))) < 3 &&
         receiver == process.env.WALLET_ADDRESS &&
         !res
       ) {

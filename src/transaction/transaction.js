@@ -4,15 +4,13 @@ const crypto = require("crypto");
 const Merchant = require("../modals/metchantmodel");
 const Transaction = require("../modals/transactionmodel");
 const EscrowTransaction = require("../modals/escrowtxmodal");
-
-const xrpl = require("xrpl");
-const { getTxData } = require("../data_workers/xrpl");
+const { cashChecks } = require("../swappayments/cashcheck");
 const { isValidTransaction } = require("../payments/utils");
 const fetch = require("node-fetch");
 import email from "../email";
 
 // Express Routes
-app.post('/api/split-payment/initiate', async (req, res) => {
+app.post("/api/split-payment/initiate", async (req, res) => {
   const { txHash, secret, emails, amount } = req.body;
 
   try {
@@ -22,18 +20,19 @@ app.post('/api/split-payment/initiate', async (req, res) => {
     const transaction = new EscrowTransaction({
       spid: splitPaymentID,
       amount,
-      participants: [{
-        email: emails[0],
-        escrowId,
-        secret
-      }],
+      participants: [
+        {
+          email: emails[0],
+          escrowId,
+          secret,
+        },
+      ],
     });
 
-  
     for (const email_ of emails.slice(1)) {
       email.sendEmail({
         to: email_,
-        subject: 'Payment Link for Split Payment',
+        subject: "Payment Link for Split Payment",
         text: `Here is your payment link: <link>?id=${splitPaymentID}`,
       });
     }
@@ -42,10 +41,20 @@ app.post('/api/split-payment/initiate', async (req, res) => {
     //await Promise.all(invitations.map(invitation => invitation.save()));
     await transaction.save();
 
-    res.status(200).json({ success: true, message: 'Split payment initiated successfully.' });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Split payment initiated successfully.",
+      });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, error: 'An error occurred while initiating the split payment.' });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: "An error occurred while initiating the split payment.",
+      });
   }
 });
 
@@ -63,13 +72,12 @@ router.post("/submitted", async (req, res) => {
       users,
       extradata,
     } = req.body;
+    
     const transactionid = crypto.randomUUID().toString();
     // Fetch the merchant's public key
     const merchant = await Merchant.findOne({ merchantId });
     if (!merchant) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Merchant not found." });
+      return res.status(404).json({ error: "Merchant not found." });
     }
 
     // Verify the signed hash
@@ -142,11 +150,20 @@ router.post("/submitted", async (req, res) => {
   }
 });
 
-function check1(hashes, amount) {
-  for (let i = 0; i < hashes.length; i++) {
-    let data = getTxData(data);
+async function check1(hashes) {
+  try {
+    let data = await cashChecks(hashes[0]);
+    if (data == false) {
+      return false;
+    }
+    if (data["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
+      return false;
+    }
+
+    return { success: true, amount: data["result"]["Amount"] };
+  } catch {
+    return false;
   }
-  return true;
 }
 
 async function check2(hashes, amount) {
@@ -234,59 +251,4 @@ const verifyTransaction = (publicKey, transactionData, signed) => {
   }
 };
 
-const createChecks = async (amount, destination) => {
-  // Can sign offline if the txJSON has all required fields
-  const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
-
-  await client.connect();
-
-  console.log("Connected");
-
-  const sender = "rQpovM9Xe7vYSz5HNfbEJKAeFeVEpV9cTq";
-  const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
-  const seed = "sEd7qjs65MSHRaaaXGpCvsiJsHwG6JJ";
-  const wallet = xrpl.Wallet.fromSeed(seed);
-  const tx_json = await client.autofill({
-    TransactionType: "CheckCreate",
-    Account: sender,
-    Destination: "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo",
-    SendMax: "100",
-
-    Expiration: 810113521,
-    DestinationTag: 1,
-    Fee: "12",
-  });
-  const signed = wallet.sign(tx_json);
-  console.log(signed);
-  const submit_result = await client.submitAndWait(signed.tx_blob);
-  console.log(submit_result);
-};
-//E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97
-
-const cashChecks = async (checkid) => {
-  const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
-
-  await client.connect();
-
-  console.log("Connected");
-
-  const sender = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
-  const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
-  const seed = "sEdToLE7Mf9oTJBc7sDQKzVPrHaM6dH";
-  const wallet = xrpl.Wallet.fromSeed(seed);
-  const tx_json = await client.autofill({
-    TransactionType: "CheckCash",
-    Account: sender,
-    Amount: "100",
-
-    CheckID: "E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97",
-    Fee: "12",
-  });
-  const signed = wallet.sign(tx_json);
-  console.log(signed);
-  const submit_result = await client.submitAndWait(signed.tx_blob);
-  console.log(submit_result);
-};
-//createChecks(100,"fdf")
-//cashChecks("E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97")
 module.exports = { router };

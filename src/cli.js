@@ -2,8 +2,7 @@ const vorpal = require("vorpal")();
 const xrpl = require("xrpl");
 const wallet = require('./wallet/index')
 import xrpl_worker from './data_workers/xrpl'
-
-
+import {creatCheck, createCheck} from './swappayments/check';
 import email from "./email";
 import { createOffer, priceOracle } from "./swappayments/dex";
 async function createWallet() {

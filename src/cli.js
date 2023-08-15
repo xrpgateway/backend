@@ -2,9 +2,9 @@ const vorpal = require("vorpal")();
 const xrpl = require("xrpl");
 const wallet = require('./wallet/index')
 import xrpl_worker from './data_workers/xrpl'
-import {creatCheck, createCheck} from './swappayments/check';
 import email from "./email";
-import { createOffer, priceOracle } from "./swappayments/dex";
+import {  priceOracle } from "./swappayments/dex";
+
 async function createWallet() {
   const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
   await client.connect();
@@ -72,7 +72,7 @@ vorpal.command("fundmecurrency [xrp] [currency] [issuer]").action(async function
     let usdValue = (oracleRes * parseFloat(args.xrp)).toFixed(4)
     console.log(usdValue)
     usdValue = usdValue - (usdValue * 0.1)
-    currencyObj["value"] = usdValue 
+    currencyObj["value"] = usdValue.toFixed(2) 
 
     const tx = await wallet.sendTx({
       TransactionType: "OfferCreate",
@@ -91,19 +91,7 @@ vorpal.command("fundmecurrency [xrp] [currency] [issuer]").action(async function
   callback();
 });
 
-vorpal.command("offertest").action(async function (args, callback) {
-  try {
-    wallet.startTransactionQueueResolver()
 
-    createOffer("3000", "2", {
-      currency: "USD",
-      issuer: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
-    });
-  } catch (e) {
-    console.error(e);
-  }
-  callback();
-});
 
 vorpal
   .command("priceoracle [currency] [issuer]")

@@ -1,17 +1,25 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 // Define the XRPTransaction schema
 const EscrowTransactionSchema = new mongoose.Schema({
-    spid: String,
-    amount: String,
-    participants: [{
+  spid: String,
+  amount: String,
+  participants: [
+    {
       email: String,
-      escrowId: String,
-      secret: String
-    }],
-  });
+      txHash: String,
+      secret: String,
+    },
+  ],
+  merchantId: String,
+  data: String,
+  extradata: String,
+});
 
 // Create the XRPTransaction model
-const EscrowTransaction = mongoose.model('EscrowTransaction', EscrowTransactionSchema);
+const EscrowTransaction = mongoose.model(
+  "EscrowTransaction",
+  EscrowTransactionSchema
+);
 
 module.exports = EscrowTransaction;

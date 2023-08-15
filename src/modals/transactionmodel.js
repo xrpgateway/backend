@@ -39,7 +39,7 @@ const xrpTransactionSchema = new mongoose.Schema({
   ],
   users: [
     {
-      type: String
+      type: Object
     }
   ],
   data:{

@@ -3,10 +3,51 @@ const router = express.Router();
 const crypto = require("crypto");
 const Merchant = require("../modals/metchantmodel");
 const Transaction = require("../modals/transactionmodel");
+const EscrowTransaction = require("../modals/escrowtxmodal");
+
 const xrpl = require("xrpl");
 const { getTxData } = require("../data_workers/xrpl");
 const { isValidTransaction } = require("../payments/utils");
-const fetch = require('node-fetch');
+const fetch = require("node-fetch");
+import email from "../email";
+
+// Express Routes
+app.post('/api/split-payment/initiate', async (req, res) => {
+  const { txHash, secret, emails, amount } = req.body;
+
+  try {
+    const splitPaymentID = crypto.randomUUID().toString();
+
+    // Create a new transaction
+    const transaction = new EscrowTransaction({
+      spid: splitPaymentID,
+      amount,
+      participants: [{
+        email: emails[0],
+        escrowId,
+        secret
+      }],
+    });
+
+  
+    for (const email_ of emails.slice(1)) {
+      email.sendEmail({
+        to: email_,
+        subject: 'Payment Link for Split Payment',
+        text: `Here is your payment link: <link>?id=${splitPaymentID}`,
+      });
+    }
+
+    // Save invitations and transaction
+    //await Promise.all(invitations.map(invitation => invitation.save()));
+    await transaction.save();
+
+    res.status(200).json({ success: true, message: 'Split payment initiated successfully.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, error: 'An error occurred while initiating the split payment.' });
+  }
+});
 
 // Endpoint to submit and validate a transaction
 router.post("/submitted", async (req, res) => {
@@ -78,25 +119,23 @@ router.post("/submitted", async (req, res) => {
     await transac.save();
 
     if (merchant.webhookUrl) {
-        fetch(merchant.webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type':'application/json'
-            },
-            body: JSON.stringify({
-                data,
-                transactionid,
-                extradata,
-                userTransactionHash: transactionHashes
-            })
-        })
-    }
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Transaction submitted and validated successfully.",
+      fetch(merchant.webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data,
+          transactionid,
+          extradata,
+          userTransactionHash: transactionHashes,
+        }),
       });
+    }
+    res.status(200).json({
+      success: true,
+      message: "Transaction submitted and validated successfully.",
+    });
   } catch (error) {
     console.error("Error processing transaction:", error);
     res.status(500).json({ error: "Internal server error." });
@@ -113,7 +152,7 @@ function check1(hashes, amount) {
 async function check2(hashes, amount) {
   const txHash = hashes[0];
   if (await isValidTransaction(txHash, amount)) {
-    return true
+    return true;
   }
   return false;
 }

@@ -10,7 +10,7 @@ const fetch = require("node-fetch");
 import email from "../email";
 
 // Express Routes
-app.post("/api/split-payment/initiate", async (req, res) => {
+router.post("/api/split-payment/initiate", async (req, res) => {
   const { txHash, secret, emails, amount } = req.body;
 
   try {

@@ -69,9 +69,10 @@ vorpal.command("fundmecurrency [xrp] [currency] [issuer]").action(async function
     } 
     const oracleRes = await priceOracle(currencyObj)
     console.log(oracleRes)
-    const usdValue = (oracleRes * parseFloat(args.xrp)).toFixed(4)
+    let usdValue = (oracleRes * parseFloat(args.xrp)).toFixed(4)
     console.log(usdValue)
-    currencyObj["value"] = usdValue
+    usdValue = usdValue - (usdValue * 0.1)
+    currencyObj["value"] = usdValue 
 
     const tx = await wallet.sendTx({
       TransactionType: "OfferCreate",

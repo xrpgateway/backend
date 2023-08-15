@@ -27,6 +27,11 @@ const xrpTransactionSchema = new mongoose.Schema({
     enum: ['pending', 'completed', 'failed'],
     default: 'pending'
   },
+  payout: {
+    type: String,
+    enum: ['pending', 'completed', 'failed'],
+    default: 'pending'  
+  },
   userTransactionHash: [
     {
       type: String

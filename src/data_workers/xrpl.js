@@ -93,7 +93,7 @@ const getXRPPaymentPaths = async () => {
 }
 
 const getOffers = async (sendCurrency, receiveCurrency) => {
-  const client = new xrpl.Client("wss://xrplcluster.com/" || process.env.XRP_WEBHOOKH_URL);
+  const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
   await client.connect();
   const response = await client.request({
     "id": 4,

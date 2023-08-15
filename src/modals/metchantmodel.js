@@ -30,6 +30,9 @@ const merchantSchema = new mongoose.Schema({
   xrpaddr: {
     type: String,
     default: 0
+  },
+  webhookUrl: {
+    type: String
   }
 });
 

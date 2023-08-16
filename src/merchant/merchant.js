@@ -102,8 +102,8 @@ router.get('/getkey', jwtMiddleware, async (req, res) => {
             return res.status(403).send('Access denied.');
         }
 
-        const { merchantSecretKey, merchantKey,merchantId } = merchant;
-        res.json({ merchantSecretKey, merchantKey,merchantId});
+        const { merchantSecretKey, merchantKey,merchantId,xrpaddr,merchantEmail } = merchant;
+        res.json({ merchantSecretKey, merchantKey,merchantId,xrpaddr,merchantEmail});
     } catch (error) {
         console.log(error)
         res.status(500).send('Error getting keys.');

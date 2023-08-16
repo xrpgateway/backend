@@ -1,240 +1,407 @@
 const express = require("express");
 const router = express.Router();
-const crypto = require('crypto');
-const Merchant = require('../modals/metchantmodel');
-const Transaction = require('../modals/transactionmodel')
-const xrpl = require("xrpl");
-const { getTxData } = require('../data_workers/xrpl')
-const { cashChecks } = require('../swappayments/cashcheck')
-const wallet = require('../wallet/index')
-// Endpoint to submit and validate a transaction
-router.post('/submitted', async (req, res) => {
-    try {
-        const { merchantId, amount, nonce, signedHash, data, transactionHashes, transactiontype, users, extradata } = req.body;
-        const transactionid = crypto.randomUUID().toString();
-        // Fetch the merchant's public key
-        const merchant = await Merchant.findOne({ merchantId });
-        if (!merchant) {
-            return res.status(404).json({ error: 'Merchant not found.' });
-        }
+const crypto = require("crypto");
+const Merchant = require("../modals/metchantmodel");
+const Transaction = require("../modals/transactionmodel");
+const EscrowTransaction = require("../modals/escrowtxmodal");
+const { cashChecks } = require("../swappayments/cashcheck");
+const { isValidTransaction } = require("../payments/utils");
+const fetch = require("node-fetch");
+import xrpl_worker from "../data_workers/xrpl";
+import email from "../email";
+import escrow from "../swappayments/escrow";
+import { sendTx } from "../wallet";
 
-        // Verify the signed hash
-
-        // Verify the signed hash
-        let messagecheck = createTransactionData(merchantId, amount, nonce, data);
-        const isValidSignature = verifyTransaction(
-            merchant.merchantKey,
-            messagecheck,
-            signedHash
-        );
-
-        if (!isValidSignature) {
-            return res
-                .status(400)
-                .json({ success: false, error: "Invalid signature." });
-        }
-
-        let success = false;
-        switch (transactiontype) {
-            case 0:
-                success = check1(transactionHashes);
-            case 1:
-                success = await check2(transactionHashes);
-            /*case 2:
-              // need to handle using seprate endpoint
-              success = check3(transactionHashes)*/
-        }
-
-        if (!success) {
-            return res
-                .status(403)
-                .json({ success: false, error: "Not able to verify buddy" });
-        }
-
-        const transac = new Transaction({
-            paymentType: transactiontype,
-            amount: amount,
-            transactionid,
-            merchantId,
-            merchantSignedHash: signedHash,
-            stage: "completed",
-            payout: "pending",
-            userTransactionHash: transactionHashes,
-            users: users,
-            data: data,
-            extradata,
-        });
-        await transac.save();
-
-        if (merchant.webhookUrl) {
-            fetch(merchant.webhookUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    data,
-                    transactionid,
-                    extradata,
-                    userTransactionHash: transactionHashes
-                })
-            })
-        }
-        res
-            .status(200)
-            .json({
-                success: true,
-                message: "Transaction submitted and validated successfully.",
-            });
-    } catch (error) {
-        console.error("Error processing transaction:", error);
-        res.status(500).json({ error: "Internal server error." });
+router.post("/escrow_submit", async (req, res) => {
+  try {
+    const { splitPaymentID, txHash, secret, email } = req.body;
+    const escrw = await EscrowTransaction.findOne({ spid: splitPaymentID });
+    if (!escrw) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Splitpayment not found!" });
     }
+    let amount_ = (parseInt(escrw.amount) / escrw.participants.length).toFixed(
+      0
+    );
+    if (!escrow.isValidEscrow(txHash, amount_)) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not valid escrow!" });
+    }
+    let index = -1;
+    let upq = {};
+    let k = 0;
+    for (let user of escrw.participants) {
+      if (user.email == email) {
+        index = k;
+        break;
+      }
+      k += 1;
+    }
+    if (index == -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Given user not found!",
+      });
+    }
+    upq[`participants.${index}.secret`] = secret;
+    upq[`participants.${index}.txHash`] = txHash;
+    await EscrowTransaction.updateOne(
+      { spid: splitPaymentID },
+      {
+        $set: upq,
+      }
+    );
+    handleFinzlaiseEscrow(splitPaymentID);
+    res.json({ success: true, message: "Your split confirmed!" });
+  } catch (e) {
+    console.error("Error /escrow_submit:", error);
+    res.status(500).json({ success: false, error: "Internal server error." });
+  }
 });
 
+// Endpoint to submit and validate a transaction
+router.post("/submitted", async (req, res) => {
+  try {
+    const {
+      merchantId,
+      amount,
+      nonce,
+      signedHash,
+      data,
+      transactionHashes,
+      transactiontype,
+      users,
+      extradata,
+    } = req.body;
+
+    const transactionid = crypto.randomUUID().toString();
+    // Fetch the merchant's public key
+    const merchant = await Merchant.findOne({ merchantId });
+    if (!merchant) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Merchant not found." });
+    }
+
+    // Verify the signed hash
+    let messagecheck = createTransactionData(merchantId, amount, nonce, data);
+    const isValidSignature = verifyTransaction(
+      merchant.merchantKey,
+      messagecheck,
+      signedHash
+    );
+
+    if (!isValidSignature) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid signature." });
+    }
+
+    let success = false;
+    switch (transactiontype) {
+      case 0:
+        success = await check1(transactionHashes);
+      case 1:
+        success = await check2(transactionHashes, amount);
+      case 2:
+        success = await check3(
+          transactionHashes,
+          amount,
+          users,
+          merchantId,
+          data,
+          extradata
+        );
+        if (success) {
+          return res.status(200).json({
+            success: true,
+            message: "Split payment initiated!",
+          });
+        }
+    }
+
+    if (!success) {
+      return res
+        .status(403)
+        .json({ success: false, error: "Not able to verify buddy" });
+    }
+
+    const transac = new Transaction({
+      paymentType: transactiontype,
+      amount: amount,
+      transactionid,
+      merchantId,
+      merchantSignedHash: signedHash,
+      stage: "completed",
+      payout: "pending",
+      userTransactionHash: transactionHashes,
+      users: users,
+      data: data,
+      extradata,
+    });
+    await transac.save();
+
+    if (merchant.webhookUrl) {
+      fetch(merchant.webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data,
+          transactionid,
+          extradata,
+          userTransactionHash: transactionHashes,
+        }),
+      });
+    }
+    res.status(200).json({
+      success: true,
+      message: "Transaction submitted and validated successfully.",
+    });
+  } catch (error) {
+    console.error("Error processing transaction:", error);
+    res.status(500).json({ success: false, error: "Internal server error." });
+  }
+});
 
 async function check1(hashes) {
-    try {
+  try {
 
-        let data = await cashChecks(hashes[0]);
-        if (data == false) {
-            return false
-        }
-        if (data["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
-            return false
-        }
-
-
-
-        return { success: true, amount: data["result"]["Amount"] }
+    let data = await cashChecks(hashes[0]);
+    if (data == false) {
+      return false
     }
-    catch {
-        return false
-    }
+    if (data["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
+      return false
 
+
+    }
+  } catch {
+    return false;
+  }
 }
+
 
 async function check2(hashes, amount) {
-    const txHash = hashes[0];
-    if (await isValidTransaction(txHash, amount)) {
-        return true
-    }
-    return false;
+  const txHash = hashes[0];
+  if (await isValidTransaction(txHash, amount)) {
+    return true;
+  }
+  return false;
 }
 
-function check3(hashes) {
+async function check3(hashes, amount, users, merchantId, data, extradata) {
+  const txHash = hashes[0];
+  try {
+    let amount_ = (parseInt(amount) / users.length).toFixed(0);
+    if (!escrow.isValidEscrow(txHash, amount_)) {
+      return false;
+    }
+    const splitPaymentID = crypto.randomUUID().toString();
+    // Create a new transaction
+    const transaction = new EscrowTransaction({
+      spid: splitPaymentID,
+      amount,
+      participants: users,
+      merchantId,
+      data,
+      extradata,
+    });
+
+    for (const user of users.slice(1)) {
+      email.sendEmail({
+        to: user.email,
+        subject: "Payment Link for Split Payment",
+        html: `<!DOCTYPE html><html><body><h1>Your split payment link!</h1><br><a href="/?id=${splitPaymentID}&&email=${user.email}">Pay Now</a></body></html>`,
+      });
+    }
+
+    await transaction.save();
+
     return true;
+  } catch (error) {
+    console.error(error);
+  }
+  return false;
 }
+
+const handleFinzlaiseEscrow = async (splitPaymentID) => {
+  try {
+    const escrw = await EscrowTransaction.findOne({ spid: splitPaymentID });
+    const transactionHashes = [];
+    for (let user of escrw.participants) {
+      if (user.txHash == "" || user.secret == "") {
+        return;
+      }
+      transactionHashes.push(user.txHash);
+    }
+    for (let user of escrw.participants) {
+      const tx = (await xrpl_worker.getTxData(user.txHash)).result;
+      const condition = tx.Condition;
+      const sequance = tx.Sequence
+      const account = tx.Account
+      const res = await sendTx({
+        Account: process.env.WALLET_ADDRESS,
+        TransactionType: "EscrowFinish",
+        Owner: account,
+        OfferSequence: sequance,
+        Condition: condition,
+        Fulfillment: user.secret,
+      });
+      if (res["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
+        return
+      }
+    }
+
+    const transactionid = crypto.randomUUID().toString();
+    // Fetch the merchant's public key
+    const merchant = await Merchant.findOne({ merchantId: escrw.merchantId });
+    const transac = new Transaction({
+      paymentType: 2,
+      amount: escrw.amount,
+      transactionid,
+      merchantId: escrw.merchantId,
+      merchantSignedHash: "---verified---",
+      stage: "completed",
+      payout: "pending",
+      userTransactionHash: transactionHashes,
+      users: escrw.participants,
+      data: escrw.data,
+      extradata: escrw.extradata,
+    });
+    await transac.save();
+
+    if (merchant.webhookUrl) {
+      fetch(merchant.webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data,
+          transactionid,
+          extradata,
+          userTransactionHash: transactionHashes,
+        }),
+      });
+    }
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 router.get("/signtest", async (req, res) => {
-    let data = createTransactionData(
-        "322f07bf-6a92-4541-abb4-5b0f8f157774",
-        "10",
-        "abc",
-        "john"
-    );
-    console.log(data);
-    let merchantId = "322f07bf-6a92-4541-abb4-5b0f8f157774";
-    const merchant = await Merchant.findOne({ merchantId });
+  let data = createTransactionData(
+    "322f07bf-6a92-4541-abb4-5b0f8f157774",
+    "10",
+    "abc",
+    "john"
+  );
+  console.log(data);
+  let merchantId = "322f07bf-6a92-4541-abb4-5b0f8f157774";
+  const merchant = await Merchant.findOne({ merchantId });
 
-    let signedhash = signTransaction(merchant.merchantSecretKey, data);
-    console.log(signedhash);
-    res.status(200).json({ signedhash });
+  let signedhash = signTransaction(merchant.merchantSecretKey, data);
+  console.log(signedhash);
+  res.status(200).json({ signedhash });
 });
 
 router.post("/verificationtest", async (req, res) => {
-    let data = createTransactionData(
-        "322f07bf-6a92-4541-abb4-5b0f8f157774",
-        "10",
-        "abc",
-        "john"
-    );
-    console.log(data);
-    let sign = req.body.sign;
-    let merchantId = "322f07bf-6a92-4541-abb4-5b0f8f157774";
-    const merchant = await Merchant.findOne({ merchantId });
+  let data = createTransactionData(
+    "322f07bf-6a92-4541-abb4-5b0f8f157774",
+    "10",
+    "abc",
+    "john"
+  );
+  console.log(data);
+  let sign = req.body.sign;
+  let merchantId = "322f07bf-6a92-4541-abb4-5b0f8f157774";
+  const merchant = await Merchant.findOne({ merchantId });
 
-    const verifier = verifyTransaction(merchant.merchantKey, data, sign);
-    console.log(verifier);
+  const verifier = verifyTransaction(merchant.merchantKey, data, sign);
+  console.log(verifier);
 
-    res.status(200).json(verifier);
+  res.status(200).json(verifier);
 });
 const createTransactionData = (merchantId, amount, nonce, data) => {
-    try {
-        const transactionData = `${merchantId}-${amount}-${nonce}-${JSON.stringify(
-            data
-        )}`;
-        return transactionData;
-    } catch (error) {
-        console.error("Error creating transaction data:", error);
-        throw new Error("Error creating transaction data.");
-    }
+  try {
+    const transactionData = `${merchantId}-${amount}-${nonce}-${JSON.stringify(
+      data
+    )}`;
+    return transactionData;
+  } catch (error) {
+    console.error("Error creating transaction data:", error);
+    throw new Error("Error creating transaction data.");
+  }
 };
 
 const signTransaction = (privateKey, transactionData) => {
-    try {
-        const sign = crypto.createSign("RSA-SHA256");
-        sign.update(transactionData);
+  try {
+    const sign = crypto.createSign("RSA-SHA256");
+    sign.update(transactionData);
 
-        const signature = sign.sign(privateKey, "hex");
+    const signature = sign.sign(privateKey, "hex");
 
-        return signature;
-    } catch (error) {
-        console.error("Error signing transaction:", error);
-        throw new Error("Error signing transaction.");
-    }
+    return signature;
+  } catch (error) {
+    console.error("Error signing transaction:", error);
+    throw new Error("Error signing transaction.");
+  }
 };
 
 const verifyTransaction = (publicKey, transactionData, signed) => {
-    try {
-        const sign = crypto.createVerify("RSA-SHA256");
-        sign.update(transactionData);
+  try {
+    const sign = crypto.createVerify("RSA-SHA256");
+    sign.update(transactionData);
 
-        const isValidSignature = sign.verify(publicKey, signed, "hex");
+    const isValidSignature = sign.verify(publicKey, signed, "hex");
 
-        return isValidSignature;
-    } catch (error) {
-        console.error("Error signing transaction:", error);
-        throw new Error("Error signing transaction.");
-    }
+    return isValidSignature;
+  } catch (error) {
+    console.error("Error signing transaction:", error);
+    throw new Error("Error signing transaction.");
+  }
 };
 
 const createChecks = async (amount, destination) => {
-    // Can sign offline if the txJSON has all required fields
-    const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
+  // Can sign offline if the txJSON has all required fields
+  const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
 
-    await client.connect();
+  await client.connect();
 
-    console.log("Connected");
+  console.log("Connected");
 
-    const sender = "rQpovM9Xe7vYSz5HNfbEJKAeFeVEpV9cTq";
-    const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
-    const seed = "sEd7qjs65MSHRaaaXGpCvsiJsHwG6JJ";
-    const wallet = xrpl.Wallet.fromSeed(seed);
-    const tx_json = await client.autofill({
-        TransactionType: "CheckCreate",
-        Account: sender,
-        Destination: "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo",
-        SendMax: "100",
+  const sender = "rQpovM9Xe7vYSz5HNfbEJKAeFeVEpV9cTq";
+  const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
+  const seed = "sEd7qjs65MSHRaaaXGpCvsiJsHwG6JJ";
+  const wallet = xrpl.Wallet.fromSeed(seed);
+  const tx_json = await client.autofill({
+    TransactionType: "CheckCreate",
+    Account: sender,
+    Destination: "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo",
+    SendMax: "100",
 
-        Expiration: 810113521,
-        DestinationTag: 1,
-        Fee: "12",
-    });
-    const signed = wallet.sign(tx_json);
-    console.log(signed);
-    const submit_result = await client.submitAndWait(signed.tx_blob);
-    console.log(submit_result);
+    Expiration: 810113521,
+    DestinationTag: 1,
+    Fee: "12",
+  });
+  const signed = wallet.sign(tx_json);
+  console.log(signed);
+  const submit_result = await client.submitAndWait(signed.tx_blob);
+  console.log(submit_result);
 };
 //E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97
 
 /**const cashChecks = async (checkid) => {
     const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
-
+ 
     await client.connect();
-
+ 
     console.log("Connected");
-
+ 
     const sender = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
     const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
     const seed = "sEdToLE7Mf9oTJBc7sDQKzVPrHaM6dH";
@@ -243,7 +410,7 @@ const createChecks = async (amount, destination) => {
         TransactionType: "CheckCash",
         Account: sender,
         Amount: "100",
-
+ 
         CheckID: "E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97",
         Fee: "12",
     });

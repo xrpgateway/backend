@@ -7,9 +7,7 @@ async function cashCheck(txHash){
         "TransactionType": "CheckCash",
         "Account": process.env.WALLET_ADDRESS,
         "Amount": data.amount,
-
-        "CheckID":data.checkid,
-        "Fee": "12"
+        "CheckID":data.checkid
     })
     return res
 }catch(e){

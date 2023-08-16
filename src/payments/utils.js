@@ -1,6 +1,7 @@
 import xrpl_worker from "../data_workers/xrpl";
 import { createOffer, priceOracle } from "../swappayments/dex";
 const xrpReceived = require("../modals/XrpReceived");
+const xrpl = require('xrpl')
 
 async function isValidTransaction(txHash, amount) {
   try {
@@ -13,9 +14,9 @@ async function isValidTransaction(txHash, amount) {
       !Array.isArray(amount_) &&
       amount_ !== null
     ) {
-      const amountXRP = priceOracle(amount_) * parseFloat(amount_.value);
+      const amountXRP = parseFloat(amount_.value) / priceOracle(amount_);
       if (
-        Math.abs(amountXRP - amount) < 3 &&
+        Math.abs(amountXRP - parseFloat(xrpl.dropsToXrp(amount))) < 3 &&
         receiver == process.env.WALLET_ADDRESS &&
         !res
       ) {
@@ -25,7 +26,11 @@ async function isValidTransaction(txHash, amount) {
             txRaw: tx
         })
         await transactionToAdd.save()
-        createOffer(amount, amount_.value, amount_)
+
+        const discountXRP =  amountXRP - (amountXRP * 0.03)
+
+        createOffer(xrpl.xrpToDrops(discountXRP.toFixed(2)), amount_)
+
         return true;
       }
     } else {

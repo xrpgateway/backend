@@ -37,17 +37,12 @@ const CurrencyData = {
   },
 };
 
-function createOffer(receiveXrp, sendamount, currencyObj) {
-  currencyObj["value"] = sendamount;
+function createOffer(receiveXrp, currencyObj) {
   sendTx({
     TransactionType: "OfferCreate",
     Account: process.env.WALLET_ADDRESS,
     TakerGets: currencyObj,
-    TakerPays: receiveXrp  /*{
-          "currency": "GKO",
-          "issuer": "ruazs5h1qEsqpke88pcqnaseXdm6od2xc",
-          "value": "2"
-        }*/,
+    TakerPays: receiveXrp
   });
 }
 

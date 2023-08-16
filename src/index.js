@@ -4,8 +4,11 @@ import express from "express";
 import xrpl_worker from "./data_workers/xrpl";
 import cors from "cors";
 import mongoose from "mongoose";
-const { router: merchantRouter} = require('./merchant/merchant');
-const {router: transactionRouter} = require('./transaction/transaction')
+import wallet from "./wallet";
+import settlement_worker from "./transaction/settlement_worker";
+
+const merchantRouter = require('./merchant/merchant').router;
+const transactionRouter = require('./transaction/transaction').router;
 mongoose.connect(process.env.MONGO_URL).then(() => console.log("Connected!"));
 
 if (process.argv[2] == "cli") {
@@ -31,6 +34,8 @@ if (process.argv[2] == "cli") {
   app.listen(port, () => {
     console.log(`Api listening on port ${port}`);
     xrpl_worker.start();
+    wallet.startTransactionQueueResolver()
+    settlement_worker.Start()
   });
 
 }

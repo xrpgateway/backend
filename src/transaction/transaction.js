@@ -7,10 +7,47 @@ const EscrowTransaction = require("../modals/escrowtxmodal");
 const { cashChecks } = require("../swappayments/cashcheck");
 const { isValidTransaction } = require("../payments/utils");
 const fetch = require("node-fetch");
+import { dropsToXrp } from "xrpl";
 import xrpl_worker from "../data_workers/xrpl";
 import email from "../email";
+import { CurrencyData, priceOracle } from "../swappayments/dex";
 import escrow from "../swappayments/escrow";
 import { sendTx } from "../wallet";
+
+function toFixed2(num) {
+  const ratestr = num.toString();
+  let i = 0;
+  let isDot = false;
+  for (let x of ratestr) {
+    if (!isDot) {
+      if (x == ".") {
+        isDot = true;
+      }
+    } else {
+      if (x == "0") {
+        i += 1;
+      } else {
+        break;
+      }
+    }
+  }
+  return parseFloat(num).toFixed(i + 2);
+}
+
+router.get("/rate/:currency/:xrp", async (req, res) => {
+  const currency = req.params.currency;
+  const xrpval = req.params.xrp;
+  if (currency == "XRP") {
+    return res.json({ rate: 1, val: parseFloat(toFixed2(dropsToXrp(xrpval))) });
+  } else if (currency) {
+    if (CurrencyData[currency]) {
+      const rate = await priceOracle(CurrencyData[currency]);
+      return res.json({ rate: parseFloat(toFixed2(rate)), val: parseFloat(toFixed2(parseFloat(dropsToXrp(xrpval)) * rate))  });
+    }
+    return res.json({ rate: -1, val: 0 });
+  }
+  res.json({ rate: 1, val: 0 });
+});
 
 router.post("/escrow_submit", async (req, res) => {
   try {
@@ -238,8 +275,8 @@ const handleFinzlaiseEscrow = async (splitPaymentID) => {
     for (let user of escrw.participants) {
       const tx = (await xrpl_worker.getTxData(user.txHash)).result;
       const condition = tx.Condition;
-      const sequance = tx.Sequence
-      const account = tx.Account
+      const sequance = tx.Sequence;
+      const account = tx.Account;
       const res = await sendTx({
         Account: process.env.WALLET_ADDRESS,
         TransactionType: "EscrowFinish",
@@ -248,8 +285,8 @@ const handleFinzlaiseEscrow = async (splitPaymentID) => {
         Condition: condition,
         Fulfillment: user.secret,
       });
-      if(res["result"]["meta"]["TransactionResult"] != "tesSUCCESS"){
-        return
+      if (res["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
+        return;
       }
     }
 

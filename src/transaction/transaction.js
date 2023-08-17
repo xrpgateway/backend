@@ -179,6 +179,7 @@ async function check1(hashes) {
 
 
     }
+    return true
   } catch {
     return false;
   }
@@ -293,18 +294,20 @@ const handleFinzlaiseEscrow = async (splitPaymentID) => {
   }
 };
 
-router.get("/signtest", async (req, res) => {
-  let data = createTransactionData(
-    "322f07bf-6a92-4541-abb4-5b0f8f157774",
-    "10",
-    "abc",
-    "john"
-  );
+router.post("/signtest", async (req, res) => {
+  const {
+   
+    amount,
+    nonce,
+    data
+  } = req.body
+  let merchantId = req.body.merchentId
+  console.log(merchant)
+  let payload = createTransactionData(merchantId,amount,nonce,data)
   console.log(data);
-  let merchantId = "322f07bf-6a92-4541-abb4-5b0f8f157774";
   const merchant = await Merchant.findOne({ merchantId });
-
-  let signedhash = signTransaction(merchant.merchantSecretKey, data);
+  console.log(merchant)
+  let signedhash = signTransaction(merchant.merchantSecretKey, payload);
   console.log(signedhash);
   res.status(200).json({ signedhash });
 });
@@ -328,9 +331,7 @@ router.post("/verificationtest", async (req, res) => {
 });
 const createTransactionData = (merchantId, amount, nonce, data) => {
   try {
-    const transactionData = `${merchantId}-${amount}-${nonce}-${JSON.stringify(
-      data
-    )}`;
+    const transactionData = `${merchantId}-${amount}-${nonce}-${data}`;
     return transactionData;
   } catch (error) {
     console.error("Error creating transaction data:", error);

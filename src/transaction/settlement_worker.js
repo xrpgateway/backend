@@ -11,11 +11,10 @@ async function Start() {
         try{
             await client.connect();
             const balance = await client.getXrpBalance(process.env.WALLET_ADDRESS)
-            const res = await Transaction.findOne({ amount: { $lte: balance }, payout: "pending", stage: "completed" })
-            console.log(res)
+            const res = await Transaction.findOne({ amount: { $lte: xrpl.xrpToDrops(balance) }, payout: "pending", stage: "completed" })
             if(res){
                 const merchent = await Merchant.findOne({ merchantId: res.merchantId })
-                const tx = await sendXRP(merchent.xrpaddr, res.amount)
+                const tx = await sendXRP(merchent.xrpaddr, res.amount.toFixed(0))
                 if(tx.result["meta"]["TransactionResult"] == "tesSUCCESS"){
                     await Transaction.updateOne({ transactionid: res.transactionid }, { $set: { payout: "completed" } })
                 }

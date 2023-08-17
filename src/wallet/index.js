@@ -26,7 +26,7 @@ function sendXRP(destination, amount) {
   const txData = {
     TransactionType: "Payment",
     Account: wallet.address,
-    Amount: xrpl.xrpToDrops(amount),
+    Amount: amount,
     Destination: destination,
   };
   return sendTx(txData);

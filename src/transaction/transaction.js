@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const Merchant = require("../modals/metchantmodel");
 const Transaction = require("../modals/transactionmodel");
 const EscrowTransaction = require("../modals/escrowtxmodal");
-const { cashChecks } = require("../swappayments/cashcheck");
+const { cashCheck } = require("../swappayments/cashcheck");
 const { isValidTransaction } = require("../payments/utils");
 const fetch = require("node-fetch");
 import { dropsToXrp } from "xrpl";
@@ -118,7 +118,7 @@ router.post("/submitted", async (req, res) => {
     const merchant = await Merchant.findOne({ merchantId });
     if (!merchant) {
       return res
-        .status(404)
+        .status(400)
         .json({ success: false, error: "Merchant not found." });
     }
 
@@ -135,13 +135,15 @@ router.post("/submitted", async (req, res) => {
         .status(400)
         .json({ success: false, error: "Invalid signature." });
     }
-
+    console.log(transactiontype)
     let success = false;
     switch (transactiontype) {
       case 0:
         success = await check1(transactionHashes);
+        break
       case 1:
         success = await check2(transactionHashes, amount);
+        break
       case 2:
         success = await check3(
           transactionHashes,
@@ -157,6 +159,7 @@ router.post("/submitted", async (req, res) => {
             message: "Split payment initiated!",
           });
         }
+        break
     }
 
     if (!success) {
@@ -206,8 +209,9 @@ router.post("/submitted", async (req, res) => {
 
 async function check1(hashes) {
   try {
-
-    let data = await cashChecks(hashes[0]);
+    console.log(data)
+    let data = await cashCheck(hashes[0]);
+   
     if (data == false) {
       return false
     }
@@ -217,7 +221,8 @@ async function check1(hashes) {
 
     }
     return true
-  } catch {
+  } catch (e){
+    console.log(e)
     return false;
   }
 }
@@ -350,18 +355,18 @@ router.post("/signtest", async (req, res) => {
 });
 
 router.post("/verificationtest", async (req, res) => {
-  let data = createTransactionData(
-    "322f07bf-6a92-4541-abb4-5b0f8f157774",
-    "10",
-    "abc",
-    "john"
-  );
-  console.log(data);
+  const {
+   
+    amount,
+    nonce,
+    data
+  } = req.body
+  let merchantId = req.body.merchentId
   let sign = req.body.sign;
-  let merchantId = "322f07bf-6a92-4541-abb4-5b0f8f157774";
   const merchant = await Merchant.findOne({ merchantId });
-
-  const verifier = verifyTransaction(merchant.merchantKey, data, sign);
+  let payload = createTransactionData(merchantId,amount,nonce,data)
+ 
+  const verifier = verifyTransaction(merchant.merchantKey, payload, sign);
   console.log(verifier);
 
   res.status(200).json(verifier);

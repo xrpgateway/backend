@@ -11,7 +11,7 @@ async function Start() {
         try{
             await client.connect();
             const balance = await client.getXrpBalance(process.env.WALLET_ADDRESS)
-            const res = await Transaction.findOne({ amount: { $lte: xrpl.xrpToDrops(balance) }, payout: "pending", stage: "completed" })
+            const res = await Transaction.findOne({ amount: { $lte: balance }, payout: "pending", stage: "completed" })
             console.log(res)
             if(res){
                 const merchent = await Merchant.findOne({ merchantId: res.merchantId })

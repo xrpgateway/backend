@@ -5,7 +5,7 @@ import PubSub from "pubsub-js";
 process.env.XRP_WEBHOOKH_URL = "wss://s.altnet.rippletest.net:51233"
 const start = async () => {
   try {
-    
+
     const client = new xrpl.Client(process.env.XRP_WEBHOOKH_URL);
     await client.connect();
     const response = await client.request({
@@ -61,16 +61,25 @@ const getTxData = async (txHash) => {
 
 
 
-const getCheckId = async (txHash) =>{
-  try{
-  let data = await getTxData(txHash)
-  let amount = data["result"]["SendMax"]
-  let checkid = data["result"]["meta"]["AffectedNodes"][data["result"]["meta"]["AffectedNodes"].length-1]["CreatedNode"]["LedgerIndex"]
-  console.log(checkid)
-  return {checkid,amount}
+const getCheckId = async (txHash) => {
+  try {
+    let data = await getTxData(txHash)
+    console.log(data)
+    let amount = data["result"]["SendMax"]
+    let checkid;
+    for (let i=0; i < data["result"]["meta"]["AffectedNodes"].length; i++) {
+      console.log(data["result"]["meta"]["AffectedNodes"][i]["CreatedNode"])
+      if (data["result"]["meta"]["AffectedNodes"][i]["CreatedNode"]) {
+        if (data["result"]["meta"]["AffectedNodes"][i]["CreatedNode"]["LedgerEntryType"] == "Check") {
+          checkid = data["result"]["meta"]["AffectedNodes"][i]["CreatedNode"]["LedgerIndex"]
+        }
+      }
+    }
+    return { checkid, amount }
 
   }
-  catch{
+  catch (e) {
+    console.log(e)
     return false
   }
 
@@ -99,7 +108,7 @@ const getOffers = async (sendCurrency, receiveCurrency) => {
     "id": 4,
     "command": "book_offers",
     "taker": process.env.WALLET_ADDRESS,
-    "taker_gets":  receiveCurrency, /*{
+    "taker_gets": receiveCurrency, /*{
       "currency": "XRP"
     }*/
     "taker_pays": sendCurrency, /*{

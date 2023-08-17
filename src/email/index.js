@@ -11,8 +11,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendEmail = ({ to, subject, text }) => {
-const mailOptions =  { to, subject, text }
+const sendEmail = ({ to, subject, text, html }) => {
+const mailOptions =  { to, subject, text, html }
   mailOptions["from"] = process.env.ZOHO_EMAIL;
   // Define email options
   /*const mailOptions = {

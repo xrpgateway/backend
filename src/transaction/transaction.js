@@ -13,6 +13,7 @@ import email from "../email";
 import { CurrencyData, priceOracle } from "../swappayments/dex";
 import escrow from "../swappayments/escrow";
 import { sendTx } from "../wallet";
+const xrpl = require('xrpl')
 
 function toFixed2(num) {
   const ratestr = num.toString();
@@ -258,7 +259,7 @@ async function check3(hashes, amount, users, merchantId, data, extradata) {
       email.sendEmail({
         to: user.email,
         subject: "Payment Link for Split Payment",
-        html: `<!DOCTYPE html><html><body><h1>Your split payment link!</h1><br><a href="/?id=${splitPaymentID}&&email=${user.email}">Pay Now</a></body></html>`,
+        html: `<!DOCTYPE html><html><body><h1>Your split payment link!</h1><br><h2>Amount ${xrpl.dropsToXrp(amount_)} XRP</h2><br><a href="${process.env.WEBPAGE}/split_external?id=${splitPaymentID}&&email=${user.email}&&amount=${amount_}">Pay Now</a></body></html>`,
       });
     }
 
@@ -297,6 +298,14 @@ const handleFinzlaiseEscrow = async (splitPaymentID) => {
       if (res["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
         return;
       }
+    }
+
+    for (const user of escrw.participants) {
+      email.sendEmail({
+        to: user.email,
+        subject: "Transaction Successful",
+        html: `<!DOCTYPE html><html><body><h1>Your split transaction of total amount ${xrpl.dropsToXrp(escrw.amount)} XRP is successful and we also notfied the merchent for the same. Thank You!</h1></body></html>`,
+      });
     }
 
     const transactionid = crypto.randomUUID().toString();

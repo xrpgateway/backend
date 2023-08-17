@@ -206,18 +206,21 @@ router.post("/submitted", async (req, res) => {
 
 async function check1(hashes) {
   try {
+
     let data = await cashChecks(hashes[0]);
     if (data == false) {
-      return false;
+      return false
     }
     if (data["result"]["meta"]["TransactionResult"] != "tesSUCCESS") {
-      return false;
+      return false
+
+
     }
-    return true;
   } catch {
     return false;
   }
 }
+
 
 async function check2(hashes, amount) {
   const txHash = hashes[0];
@@ -400,4 +403,59 @@ const verifyTransaction = (publicKey, transactionData, signed) => {
   }
 };
 
+const createChecks = async (amount, destination) => {
+  // Can sign offline if the txJSON has all required fields
+  const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
+
+  await client.connect();
+
+  console.log("Connected");
+
+  const sender = "rQpovM9Xe7vYSz5HNfbEJKAeFeVEpV9cTq";
+  const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
+  const seed = "sEd7qjs65MSHRaaaXGpCvsiJsHwG6JJ";
+  const wallet = xrpl.Wallet.fromSeed(seed);
+  const tx_json = await client.autofill({
+    TransactionType: "CheckCreate",
+    Account: sender,
+    Destination: "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo",
+    SendMax: "100",
+
+    Expiration: 810113521,
+    DestinationTag: 1,
+    Fee: "12",
+  });
+  const signed = wallet.sign(tx_json);
+  console.log(signed);
+  const submit_result = await client.submitAndWait(signed.tx_blob);
+  console.log(submit_result);
+};
+//E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97
+
+/**const cashChecks = async (checkid) => {
+    const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
+ 
+    await client.connect();
+ 
+    console.log("Connected");
+ 
+    const sender = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
+    const receiver = "r9tFDAbb6xExyMp6TDDqGQfTq8vzCqGGXo";
+    const seed = "sEdToLE7Mf9oTJBc7sDQKzVPrHaM6dH";
+    const wallet = xrpl.Wallet.fromSeed(seed);
+    const tx_json = await client.autofill({
+        TransactionType: "CheckCash",
+        Account: sender,
+        Amount: "100",
+ 
+        CheckID: "E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97",
+        Fee: "12",
+    });
+    const signed = wallet.sign(tx_json);
+    console.log(signed);
+    const submit_result = await client.submitAndWait(signed.tx_blob);
+    console.log(submit_result);
+};**/
+//createChecks(100,"fdf")
+//cashChecks("E89A3641CC473AAC8FFCFC915C09BAAB5FDFC28F1C15F90E7CF784DC24FC1A97")
 module.exports = { router };

@@ -19,7 +19,7 @@
     "watch:dev": "nodemon"
   },
   "engines": {
-    "node": ">=16 <17"
+    "node": "=16.20.2"
   },
   "author": "",
   "license": "ISC",
@@ -40,7 +40,7 @@
     "queue-event-emitter": "^2.1.1",
     "vorpal": "^1.12.0",
     "xrpl": "^2.7.0",
-    
+
     "@babel/cli": "^7.21.0",
     "@babel/core": "^7.21.3",
     "@babel/preset-env": "^7.20.2",

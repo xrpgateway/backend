@@ -13,6 +13,7 @@ import email from "../email";
 import { CurrencyData, priceOracle } from "../swappayments/dex";
 import escrow from "../swappayments/escrow";
 import { sendTx } from "../wallet";
+const jwt = require('jsonwebtoken');
 
 function toFixed2(num) {
   const ratestr = num.toString();
@@ -34,6 +35,32 @@ function toFixed2(num) {
   return parseFloat(num).toFixed(i + 2);
 }
 
+const jwtMiddleware = (req, res, next) => {
+  const token = req.header('x-auth-token');
+
+  if (!token) {
+    return res.status(401).send('No token, authorization denied.');
+  }
+
+  try {
+    const decoded = jwt.verify(token, 'yourSecretKey');
+    req.merchantId = decoded.merchantId;
+    next();
+  } catch (error) {
+    console.log("ok" + error)
+    res.status(401).send('Token is not valid.');
+  }
+};
+
+
+router.post("/gettransaction", jwtMiddleware, async (req, res) => {
+  let merchantId = req.body.merchantId
+  let transactions = await Transaction.find({ merchantId: merchantId })
+  console.log(transactions)
+  return res.json(transactions)
+
+})
+
 router.get("/rate/:currency/:xrp", async (req, res) => {
   const currency = req.params.currency;
   const xrpval = req.params.xrp;
@@ -42,12 +69,14 @@ router.get("/rate/:currency/:xrp", async (req, res) => {
   } else if (currency) {
     if (CurrencyData[currency]) {
       const rate = await priceOracle(CurrencyData[currency]);
-      return res.json({ rate: parseFloat(toFixed2(rate)), val: parseFloat(toFixed2(parseFloat(dropsToXrp(xrpval)) * rate))  });
+      return res.json({ rate: parseFloat(toFixed2(rate)), val: parseFloat(toFixed2(parseFloat(dropsToXrp(xrpval)) * rate)) });
     }
     return res.json({ rate: -1, val: 0 });
   }
   res.json({ rate: 1, val: 0 });
 });
+
+
 
 router.post("/escrow_submit", async (req, res) => {
   try {
@@ -211,7 +240,7 @@ async function check1(hashes) {
   try {
     console.log(data)
     let data = await cashCheck(hashes[0]);
-   
+
     if (data == false) {
       return false
     }
@@ -221,7 +250,7 @@ async function check1(hashes) {
 
     }
     return true
-  } catch (e){
+  } catch (e) {
     console.log(e)
     return false;
   }
@@ -270,6 +299,9 @@ async function check3(hashes, amount, users, merchantId, data, extradata) {
   }
   return false;
 }
+
+
+
 
 const handleFinzlaiseEscrow = async (splitPaymentID) => {
   try {
@@ -338,14 +370,14 @@ const handleFinzlaiseEscrow = async (splitPaymentID) => {
 
 router.post("/signtest", async (req, res) => {
   const {
-   
+
     amount,
     nonce,
     data
   } = req.body
   let merchantId = req.body.merchentId
   console.log(merchant)
-  let payload = createTransactionData(merchantId,amount,nonce,data)
+  let payload = createTransactionData(merchantId, amount, nonce, data)
   console.log(data);
   const merchant = await Merchant.findOne({ merchantId });
   console.log(merchant)
@@ -356,7 +388,7 @@ router.post("/signtest", async (req, res) => {
 
 router.post("/verificationtest", async (req, res) => {
   const {
-   
+
     amount,
     nonce,
     data
@@ -364,8 +396,8 @@ router.post("/verificationtest", async (req, res) => {
   let merchantId = req.body.merchentId
   let sign = req.body.sign;
   const merchant = await Merchant.findOne({ merchantId });
-  let payload = createTransactionData(merchantId,amount,nonce,data)
- 
+  let payload = createTransactionData(merchantId, amount, nonce, data)
+
   const verifier = verifyTransaction(merchant.merchantKey, payload, sign);
   console.log(verifier);
 

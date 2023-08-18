@@ -6,6 +6,7 @@ const xrpl = require('xrpl')
 async function isValidTransaction(txHash, amount) {
   try {
     const tx = await xrpl_worker.getTxData(txHash);
+    console.log(tx)
     const amount_ = tx.result.Amount;
     const receiver = tx.result.Destination;
     const res = await xrpReceived.findOne({ txHash: txHash });
@@ -14,7 +15,8 @@ async function isValidTransaction(txHash, amount) {
       !Array.isArray(amount_) &&
       amount_ !== null
     ) {
-      const amountXRP = parseFloat(amount_.value) / priceOracle(amount_);
+      const amountXRP = parseFloat(amount_.value) / await priceOracle(amount_);
+      console.log(`Diff: ${Math.abs(amountXRP - parseFloat(xrpl.dropsToXrp(amount)))}`)
       if (
         Math.abs(amountXRP - parseFloat(xrpl.dropsToXrp(amount))) < 3 &&
         receiver == process.env.WALLET_ADDRESS &&

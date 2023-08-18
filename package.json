@@ -39,8 +39,9 @@
     "pubsub-js": "^1.9.4",
     "queue-event-emitter": "^2.1.1",
     "vorpal": "^1.12.0",
-    "xrpl": "^2.7.0",
-
+    "xrpl": "^2.7.0"
+  },
+  "devDependencies": {
     "@babel/cli": "^7.21.0",
     "@babel/core": "^7.21.3",
     "@babel/preset-env": "^7.20.2",
@@ -50,8 +51,5 @@
     "nodemon": "^2.0.22",
     "npm-run-all": "^4.1.5",
     "rimraf": "^4.4.1"
-  },
-  "devDependencies": {
-
   }
 }
